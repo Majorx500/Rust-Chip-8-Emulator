@@ -1,4 +1,5 @@
 use rand::rng;
+use sola_raylib::ffi::KeyboardKey::KEY_KP_1;
 use sola_raylib::prelude::*;
 use std::fs::File;
 use std::io::{self, Read};
@@ -189,8 +190,8 @@ fn emulate_cycle(sys: &mut System) {
             sys.pc += 2;
         }
         0x9000 => {
-            let x: usize = ((opcode & (0x0F00)) >> 2).try_into().unwrap();
-            let y: usize = ((opcode & 0x00F0) >> 2).try_into().unwrap();
+            let x: usize = ((opcode & (0x0F00)) >> 8).try_into().unwrap();
+            let y: usize = ((opcode & 0x00F0) >> 4).try_into().unwrap();
             if sys.registers[x] != sys.registers[y] {
                 sys.pc += 2;
             }
@@ -214,10 +215,10 @@ fn emulate_cycle(sys: &mut System) {
             sys.pc += 2;
         }
         0xD000 => {
-            let x = sys.registers[((opcode & 0x0F00) >> 8) as usize];
-            let x = x % 64;
-            let y = sys.registers[((opcode & 0x00F0) >> 4) as usize];
-            let y = y % 32;
+            let x = sys.registers[((opcode & 0x0F00) >> 8) as usize] as u16;
+            let x: u16 = x % 64;
+            let y = sys.registers[((opcode & 0x00F0) >> 4) as usize] as u16;
+            let y: u16 = y % 32;
 
             let N = (opcode & 0x000F) as u8;
             sys.registers[0xF] = 0;
@@ -226,10 +227,14 @@ fn emulate_cycle(sys: &mut System) {
                 let pixel = sys.memory[sys.i + yline as usize];
                 for xline in 0..8 {
                     if (pixel & (0x80 >> xline)) != 0 {
-                        if sys.gfx[(x + xline + (y + yline).wrapping_mul(64)) as usize] == 1 {
+                        let mut idx = (x + xline + (y + yline as u16).wrapping_mul(64)) as usize;
+                        if idx >= 2048{
+                            idx = 2047
+                        }
+                        if sys.gfx[idx] == 1 {
                             sys.registers[0xF] = 1;
                         }
-                        sys.gfx[(x + xline + (y + yline).wrapping_mul(64)) as usize] ^= 1;
+                        sys.gfx[idx] ^= 1;
                     }
                 }
             }
@@ -333,21 +338,45 @@ fn main() {
     let _ = load_game(&mut system, String::into("pong.rom".to_string()));
 
     let (mut rl, thread) = sola_raylib::init().size(640, 320).title("").build();
-        
+
     while !rl.window_should_close() {
         emulate_cycle(&mut system);
 
+        system.key[0] = rl.is_key_down(KeyboardKey::KEY_X).into();
+        system.key[1] = rl.is_key_down(KeyboardKey::KEY_ONE).into();
+        system.key[2] = rl.is_key_down(KeyboardKey::KEY_TWO).into();
+        system.key[3] = rl.is_key_down(KeyboardKey::KEY_THREE).into();
+        system.key[4] = rl.is_key_down(KeyboardKey::KEY_Q).into();
+        system.key[5] = rl.is_key_down(KeyboardKey::KEY_W).into();
+        system.key[6] = rl.is_key_down(KeyboardKey::KEY_E).into();
+        system.key[7] = rl.is_key_down(KeyboardKey::KEY_A).into();
+        system.key[8] = rl.is_key_down(KeyboardKey::KEY_S).into();
+        system.key[9] = rl.is_key_down(KeyboardKey::KEY_D).into();
+        system.key[0xA] = rl.is_key_down(KeyboardKey::KEY_Z).into();
+        system.key[0xB] = rl.is_key_down(KeyboardKey::KEY_C).into();
+        system.key[0xC] = rl.is_key_down(KeyboardKey::KEY_FOUR).into();
+        system.key[0xD] = rl.is_key_down(KeyboardKey::KEY_R).into();
+        system.key[0xE] = rl.is_key_down(KeyboardKey::KEY_F).into();
+        system.key[0xF] = rl.is_key_down(KeyboardKey::KEY_V).into();
+
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
-        for i in 0..(64*32){
-            let mut c = Color::BLACK;
-            if system.gfx[i] == 1 {
-                c = Color::WHITE;
+        for y in 0..32 {
+            for x in 0..64 {
+                let mut c = Color::BLACK;
+                if system.gfx[x + 64 * y] == 1 {
+                    c = Color::WHITE;
+                }
+                d.draw_rectangle(
+                    (x * 10).try_into().unwrap(),
+                    (y * 10).try_into().unwrap(),
+                    10,
+                    10,
+                    c,
+                );
             }
-            d.draw_rectangle(((i % 64) * 10).try_into().unwrap(), ((i / 64) * 10).try_into().unwrap(), 10,10,c);
         }
+
         thread::sleep(Duration::from_millis(2));
     }
-
-    
 }
