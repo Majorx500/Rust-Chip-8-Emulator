@@ -1,6 +1,6 @@
 use rand::rng;
-use sola_raylib::ffi::KeyboardKey::KEY_KP_1;
-use sola_raylib::prelude::*;
+use raylib::prelude::*;
+use std::f32::consts::PI;
 use std::fs::File;
 use std::io::{self, Read};
 use std::thread;
@@ -65,7 +65,7 @@ fn init_system() -> System {
 fn emulate_cycle(sys: &mut System) {
     let pc: usize = sys.pc.clone();
     let opcode: u16 = ((sys.memory[pc] as u16) << 8) | sys.memory[pc + 1] as u16;
-    println!("Opcode: {opcode:#x} at pc: {pc:#x}");
+    // println!("Opcode: {opcode:#x} at pc: {pc:#x}");
     match opcode & 0xF000 {
         0x0000 => {
             let dt: u16 = opcode & 0x00FF;
@@ -228,7 +228,7 @@ fn emulate_cycle(sys: &mut System) {
                 for xline in 0..8 {
                     if (pixel & (0x80 >> xline)) != 0 {
                         let mut idx = (x + xline + (y + yline as u16).wrapping_mul(64)) as usize;
-                        if idx >= 2048{
+                        if idx >= 2048 {
                             idx = 2047
                         }
                         if sys.gfx[idx] == 1 {
@@ -271,12 +271,11 @@ fn emulate_cycle(sys: &mut System) {
                     sys.registers[x] = sys.delay_timer;
                 }
                 0x000A => {
-                    let mut s = 0;
                     for i in 0..16 {
-                        s += sys.key[i];
-                    }
-                    if s > 0 {
-                        sys.pc += 2;
+                        if sys.key[i] != 0 {
+                            sys.registers[x] = i as u8;
+                            sys.pc += 2;
+                        }
                     }
                 }
                 0x0015 => {
@@ -326,7 +325,7 @@ fn emulate_cycle(sys: &mut System) {
 
     if sys.sound_timer > 0 {
         if sys.sound_timer == 1 {
-            println!("SOUND");
+            println!("BEEP!");
         }
         sys.sound_timer -= 1;
     }
@@ -335,9 +334,11 @@ fn emulate_cycle(sys: &mut System) {
 fn main() {
     let mut system = init_system();
 
-    let _ = load_game(&mut system, String::into("pong.rom".to_string()));
+    let _ = load_game(&mut system, String::into("connect.ch8".to_string()));
 
-    let (mut rl, thread) = sola_raylib::init().size(640, 320).title("").build();
+    let (mut rl, thread) = raylib::init().size(640, 320).title("").build();
+
+    rl.set_target_fps(60);
 
     while !rl.window_should_close() {
         emulate_cycle(&mut system);
